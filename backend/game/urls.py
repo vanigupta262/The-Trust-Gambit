@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     RegisterUserView, CustomAuthToken, 
     ParticipantProfileView, DomainListView, 
-    SelfRatingCreateListView, HostelListView
+    SelfRatingCreateListView, HostelListView,
+    CurrentRoundView, SubmitActionView
 )
 
 urlpatterns = [
@@ -12,4 +13,7 @@ urlpatterns = [
     path('domains/', DomainListView.as_view(), name='domain-list'),
     path('hostels/', HostelListView.as_view(), name='hostel-list'),
     path('self-ratings/', SelfRatingCreateListView.as_view(), name='self-rating-list-create'),
+    path('current-round/', CurrentRoundView.as_view(), name='current-round'),
+    path('submit-action/', SubmitActionView.as_view(), name='submit-action'),
+
 ]

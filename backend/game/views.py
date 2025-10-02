@@ -1,4 +1,3 @@
-# game/views.py
 from rest_framework import generics, status, serializers
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -7,8 +6,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
 
-from .models import Participant, Domain, SelfRating, Hostel
-from .serializers import UserSerializer, ParticipantProfileSerializer, SelfRatingSerializer, HostelSerializer
+from .models import Participant, Domain, SelfRating, Hostel, Round
+from .serializers import UserSerializer, ParticipantProfileSerializer, SelfRatingSerializer, HostelSerializer, RoundSerializer, SimpleParticipantSerializer, ActionSerializer
 
 class RegisterUserView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -104,3 +103,54 @@ class HostelListView(generics.ListAPIView):
     queryset = Hostel.objects.all()
     serializer_class = HostelSerializer
     permission_classes = [AllowAny]
+
+class CurrentRoundView(APIView):
+    """
+    Provides the details for the current active round and a list of participants.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        current_round = Round.objects.filter(is_completed=False).order_by('-round_number').first()
+
+        if not current_round:
+            return Response({"detail": "No active round at the moment."}, status=status.HTTP_404_NOT_FOUND)
+
+        other_participants = Participant.objects.exclude(user=request.user)
+        
+        round_serializer = RoundSerializer(current_round)
+        participants_serializer = SimpleParticipantSerializer(other_participants, many=True)
+
+        return Response({
+            'current_round': round_serializer.data,
+            'delegation_targets': participants_serializer.data
+        })
+    
+# game/views.py
+# ... (add this to the existing file)
+
+class SubmitActionView(generics.CreateAPIView):
+    """
+    Allows a participant to submit their action for the current round.
+    """
+    serializer_class = ActionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_context(self):
+        # Pass the current round to the serializer for validation
+        context = super().get_serializer_context()
+        current_round = Round.objects.filter(is_completed=False).order_by('-round_number').first()
+        if not current_round:
+            # This should ideally be handled with a custom exception
+            raise serializers.ValidationError("No active round available to submit an action for.")
+        context['round'] = current_round
+        return context
+
+    def perform_create(self, serializer):
+        current_round = self.get_serializer_context()['round']
+        
+        # Automatically associate the action with the current participant and round
+        serializer.save(
+            participant=self.request.user.participant,
+            round=current_round
+        )
