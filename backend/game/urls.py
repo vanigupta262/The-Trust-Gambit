@@ -1,0 +1,15 @@
+from django.urls import path
+from .views import (
+    RegisterUserView, CustomAuthToken, 
+    ParticipantProfileView, DomainListView, 
+    SelfRatingCreateListView, HostelListView
+)
+
+urlpatterns = [
+    path('register/', RegisterUserView.as_view(), name='register'),
+    path('login/', CustomAuthToken.as_view(), name='login'),
+    path('profile/', ParticipantProfileView.as_view(), name='participant-profile'),
+    path('domains/', DomainListView.as_view(), name='domain-list'),
+    path('hostels/', HostelListView.as_view(), name='hostel-list'),
+    path('self-ratings/', SelfRatingCreateListView.as_view(), name='self-rating-list-create'),
+]
