@@ -125,9 +125,6 @@ class CurrentRoundView(APIView):
             'current_round': round_serializer.data,
             'delegation_targets': participants_serializer.data
         })
-    
-# game/views.py
-# ... (add this to the existing file)
 
 class SubmitActionView(generics.CreateAPIView):
     """
