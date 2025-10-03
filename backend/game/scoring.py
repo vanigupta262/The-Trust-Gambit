@@ -18,7 +18,10 @@ def calculate_scores_for_round(round_id):
     game = round_obj.game
     actions = Action.objects.filter(round=round_obj)
     action_map = {action.participant.id: action for action in actions}
-    round_points = {p_id: 0 for p_id in action_map.keys()}
+    # This dictionary will store the final scores for the round, including bonuses.
+    final_round_points = {p_id: 0 for p_id in action_map.keys()}
+    # This dictionary will store the base points (pre-bonus) used for delegation calculations.
+    base_round_points = {p_id: 0 for p_id in action_map.keys()}
 
     # --- R4: Detect and Penalize Cycles FIRST ---
     delegation_graph = {
@@ -27,58 +30,65 @@ def calculate_scores_for_round(round_id):
         if action.action_type == Action.ActionType.DELEGATE and action.delegated_to
     }
     all_cycle_members = set()
-    # (Cycle detection logic remains the same...)
+
+    # Find all participants who are part of any cycle.
     for p_id in delegation_graph:
+        # Avoid re-checking if already identified as part of a cycle
+        if p_id in all_cycle_members:
+            continue
         path = [p_id]
         current = p_id
         while current in delegation_graph:
             current = delegation_graph[current]
             if current in path:
                 cycle_start_index = path.index(current)
-                cycle_members = path[cycle_start_index:]
-                for member_id in cycle_members:
-                    round_points[member_id] = -1
+                # Penalize all members of the found cycle
+                for member_id in path[cycle_start_index:]:
+                    base_round_points[member_id] = -1
                     all_cycle_members.add(member_id)
                 break 
             path.append(current)
-
-    for p_id, delegated_to_id in delegation_graph.items():
-        if p_id not in all_cycle_members and delegated_to_id in all_cycle_members:
-            round_points[p_id] = -1 / game.lambda_param if game.lambda_param != 0 else -1
-
-    # Score terminal actions (Solve/Pass) for non-cycle members
+            # Protection against non-existent nodes in buggy data
+            if current not in delegation_graph and current not in action_map:
+                break
+    
+    # --- R2: Score terminal actions (Solve/Pass) for non-cycle members ---
     for p_id, action in action_map.items():
         if p_id in all_cycle_members:
             continue
 
         if action.action_type == Action.ActionType.PASS:
-            round_points[p_id] = 0
-            
+            base_round_points[p_id] = 0
         elif action.action_type == Action.ActionType.SOLVE:
             is_correct = (action.submitted_answer or '').lower() == (round_obj.correct_answer or '').lower()
             action.is_solve_correct = is_correct
-            round_points[p_id] = 1 if is_correct else -1
+            base_round_points[p_id] = 1 if is_correct else -1
     
-    # NEW ORDER: Apply R3: Reputation Bonus BEFORE delegation scoring 
+    # --- R2 (Delegation): Calculate delegation points based on pre-bonus scores ---
+    memo = {}
+    for p_id in action_map:
+        if action_map[p_id].action_type == Action.ActionType.DELEGATE:
+            _calculate_delegation_points(p_id, action_map, base_round_points, game, memo, all_cycle_members)
+
+    # All base scores are now calculated. Copy them to the final score map.
+    for p_id, points in base_round_points.items():
+        final_round_points[p_id] = points
+
+    # --- R3: Apply Reputation Bonus AFTER all base scores are set ---
     trust_counts = {}
     for action in actions:
         if action.action_type == Action.ActionType.DELEGATE and action.delegated_to:
             delegated_to_id = action.delegated_to.id
             trust_counts[delegated_to_id] = trust_counts.get(delegated_to_id, 0) + 1
     
-    for p_id, points in round_points.items():
-        if points > 0:
+    for p_id, base_points in base_round_points.items():
+        # Bonus is only applied if the base score (from solving) is positive.
+        if base_points > 0:
             bonus = game.beta_param * trust_counts.get(p_id, 0)
-            round_points[p_id] += bonus
+            final_round_points[p_id] += bonus
 
-    # NOW Score R2: Delegations using the final, bonus-adjusted scores 
-    memo = {}
-    for p_id in action_map:
-        if action_map[p_id].action_type == Action.ActionType.DELEGATE:
-            _calculate_delegation_points(p_id, action_map, round_points, game, memo, all_cycle_members)
-
-    # Finalize and Save Scores 
-    for p_id, points in round_points.items():
+    # --- Finalize and Save Scores ---
+    for p_id, points in final_round_points.items():
         action = action_map[p_id]
         action.points_awarded = points
         action.save()
@@ -95,44 +105,48 @@ def calculate_scores_for_round(round_id):
     print(f"Scoring for Round {round_id} complete.")
 
 
-def _calculate_delegation_points(p_id, action_map, round_points, game, memo, cycle_members):
+def _calculate_delegation_points(p_id, action_map, base_round_points, game, memo, cycle_members):
     """
-    Recursively calculates points for a participant who delegated.
+    Recursively calculates points for a participant who delegated based on pre-bonus scores.
     Uses memoization to avoid re-calculating scores.
     """
     if p_id in memo:
         return memo[p_id]
     
     if p_id in cycle_members:
+        # Base case for cycles is already set to -1 in the main function.
+        memo[p_id] = base_round_points[p_id]
+        return base_round_points[p_id]
+
+    action = action_map.get(p_id)
+    
+    # If points are already set (e.g., from Solve/Pass/Cycle), return them.
+    if action.action_type != Action.ActionType.DELEGATE:
+        return base_round_points.get(p_id, 0)
+
+    # Base case: delegation chain ends unexpectedly.
+    if not action.delegated_to or action.delegated_to.id not in action_map:
+        base_round_points[p_id] = -1
         memo[p_id] = -1
         return -1
 
-    action = action_map[p_id]
-    
-    # If points are already set (e.g. Pass/Solve), return them
-    if action.action_type != Action.ActionType.DELEGATE:
-        return round_points.get(p_id, 0)
-
-    # Base case: delegated to someone who didn't act or doesn't exist
-    if not action.delegated_to or action.delegated_to.id not in action_map:
-        memo[p_id] = -1 # Treat as a failed delegation
-        round_points[p_id] = -1
-        return -1
-
-    # Recursive step: get the points of the person who was delegated to
+    # Recursive step: get the points of the person who was delegated to.
     delegated_to_id = action.delegated_to.id
-    points_j = _calculate_delegation_points(delegated_to_id, action_map, round_points, game, memo, cycle_members)
+    points_j = _calculate_delegation_points(delegated_to_id, action_map, base_round_points, game, memo, cycle_members)
     
-    # Apply the scoring rule for delegation
+    # Apply the scoring rule for delegation (R2)
     final_points = 0
     lambda_param = game.lambda_param
     if points_j > 0:
         final_points = lambda_param * points_j
     elif points_j < 0:
+        # This correctly handles chains delegating into a cycle (e.g., points_j = -1)
         final_points = points_j / lambda_param if lambda_param != 0 else points_j
     else: # points_j == 0
         final_points = -1
 
-    round_points[p_id] = final_points
+    base_round_points[p_id] = final_points
     memo[p_id] = final_points
     return final_points
+
+
