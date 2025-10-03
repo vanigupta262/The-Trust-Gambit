@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
-    RegisterUserView, CustomAuthToken, 
-    ParticipantProfileView, DomainListView, 
+    DelegationGraphView, RegisterUserView, CustomAuthToken, 
+    ParticipantProfileView, DomainListView, RoundListView, 
     SelfRatingCreateListView, HostelListView,
     CurrentRoundView, SubmitActionView,
     LeaderboardView, AdminEndRoundView
@@ -14,8 +14,13 @@ urlpatterns = [
     path('domains/', DomainListView.as_view(), name='domain-list'),
     path('hostels/', HostelListView.as_view(), name='hostel-list'),
     path('self-ratings/', SelfRatingCreateListView.as_view(), name='self-rating-list-create'),
+    
     path('current-round/', CurrentRoundView.as_view(), name='current-round'),
     path('submit-action/', SubmitActionView.as_view(), name='submit-action'),
     path('leaderboard/', LeaderboardView.as_view(), name='leaderboard'),
+
+    path('rounds/', RoundListView.as_view(), name='round-list'),
+    path('rounds/<int:round_id>/delegation-graph/', DelegationGraphView.as_view(), name='delegation-graph'),
+
     path('admin/end-round/', AdminEndRoundView.as_view(), name='admin-end-round'),
 ]

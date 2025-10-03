@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, status, serializers
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
@@ -6,7 +7,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
 
-from .models import Game, GameScore, Participant, Domain, SelfRating, Hostel, Round
+from .models import Action, Game, GameScore, Participant, Domain, SelfRating, Hostel, Round
 from .serializers import GameScoreSerializer, UserSerializer, ParticipantProfileSerializer, SelfRatingSerializer, HostelSerializer, RoundSerializer, SimpleParticipantSerializer, ActionSerializer
 
 from .scoring import calculate_scores_for_round
@@ -187,3 +188,45 @@ class AdminEndRoundView(APIView):
         calculate_scores_for_round(current_round.id)
         
         return Response({'status': f'Scoring successfully initiated for round {current_round.round_number}.'})
+
+class RoundListView(generics.ListAPIView):
+    """
+    Provides a list of all rounds, with the newest first.
+    Useful for selecting a round to view its delegation graph.
+    """
+    queryset = Round.objects.all().order_by('-round_number')
+    serializer_class = RoundSerializer
+    permission_classes = [IsAuthenticated]
+
+class DelegationGraphView(APIView):
+    """
+    Returns the data needed to draw a trust graph for a specific round.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, round_id, *args, **kwargs):
+        round_obj = get_object_or_404(Round, id=round_id)
+        actions = Action.objects.filter(round=round_obj).select_related('participant__user', 'delegated_to__user')
+
+        participants_in_round = {action.participant for action in actions}
+        
+        nodes = []
+        for p in participants_in_round:
+            nodes.append({
+                'id': str(p.id),
+                'data': {'label': p.user.username},
+                'position': {'x': 0, 'y': 0} 
+            })
+
+        edges = []
+        for action in actions:
+            if action.action_type == Action.ActionType.DELEGATE and action.delegated_to:
+                edges.append({
+                    'id': f"e-{action.participant.id}-{action.delegated_to.id}",
+                    'source': str(action.participant.id),
+                    'target': str(action.delegated_to.id),
+                    'animated': True,
+                })
+        
+        return Response({'nodes': nodes, 'edges': edges})
+
