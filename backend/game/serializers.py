@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Participant, Domain, SelfRating, Hostel, Action, Round
+from .models import GameScore, Participant, Domain, SelfRating, Hostel, Action, Round
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -65,7 +65,7 @@ class ActionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Action
-        fields = ['id', 'action_type', 'delegated_to', 'participant']
+        fields = ['id', 'action_type', 'delegated_to', 'submitted_answer', 'participant']
         read_only_fields = ['id', 'participant']
 
     def __init__(self, *args, **kwargs):
@@ -75,18 +75,35 @@ class ActionSerializer(serializers.ModelSerializer):
     def validate(self, data):
         action_type = data.get('action_type')
         delegated_to = data.get('delegated_to')
+        submitted_answer = data.get('submitted_answer')
+        
         participant = self.context['request'].user.participant
 
         if Action.objects.filter(round=self.round, participant=participant).exists():
             raise serializers.ValidationError("You have already submitted an action for this round.")
 
-        if action_type == Action.ActionType.DELEGATE:
+        if action_type == Action.ActionType.SOLVE:
+            if not submitted_answer:
+                raise serializers.ValidationError("A submitted_answer is required for the 'Solve' action.")
+            if delegated_to:
+                raise serializers.ValidationError("Cannot specify a delegation target when solving.")
+        elif action_type == Action.ActionType.DELEGATE:
             if not delegated_to:
                 raise serializers.ValidationError("A target must be specified when delegating.")
             if delegated_to == participant:
                 raise serializers.ValidationError("You cannot delegate to yourself.")
+            if submitted_answer:
+                 raise serializers.ValidationError("Cannot submit an answer when delegating.")
         
         if action_type != Action.ActionType.DELEGATE and delegated_to:
             raise serializers.ValidationError("Cannot specify a delegation target unless the action is 'DELEGATE'.")
 
         return data
+    
+class GameScoreSerializer(serializers.ModelSerializer):
+    """ Serializer for the leaderboard. """
+    participant = SimpleParticipantSerializer(read_only=True)
+
+    class Meta:
+        model = GameScore
+        fields = ['participant', 'score']

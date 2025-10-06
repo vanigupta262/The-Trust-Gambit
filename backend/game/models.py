@@ -49,8 +49,12 @@ class Round(models.Model):
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='rounds')
     domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
     question_text = models.TextField()
+    correct_answer = models.CharField(max_length=255, default='correct answer here') 
     is_completed = models.BooleanField(default=False)
     round_number = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = ('game', 'round_number')
 
     def __str__(self):
         return f"Round {self.round_number} ({self.domain.name})"
@@ -64,7 +68,9 @@ class Action(models.Model):
     round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name='actions')
     participant = models.ForeignKey(Participant, on_delete=models.CASCADE)
     action_type = models.CharField(max_length=10, choices=ActionType.choices)
-    
+
+    submitted_answer = models.TextField(null=True, blank=True)
+
     delegated_to = models.ForeignKey(
         Participant,
         on_delete=models.SET_NULL,
@@ -78,3 +84,14 @@ class Action(models.Model):
 
     def __str__(self):
         return f"{self.participant.user.username} chose to {self.action_type} in Round {self.round.round_number}"
+
+class GameScore(models.Model):
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='scores')
+    participant = models.ForeignKey(Participant, on_delete=models.CASCADE, related_name='game_scores')
+    score = models.FloatField(default=0)
+
+    class Meta:
+        unique_together = ('game', 'participant')
+
+    def __str__(self):
+        return f"{self.participant.user.username}: {self.score} points in {self.game.name}"
