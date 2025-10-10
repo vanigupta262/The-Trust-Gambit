@@ -5,6 +5,7 @@
 // })();
 
 export const BASE = "https://the-trust-gambit.onrender.com/api";
+// export const BASE = "https://reddragonnm.pythonanywhere.com/api";
 // export const BASE = "http://localhost:8000/api";
 
 export function getToken() {
