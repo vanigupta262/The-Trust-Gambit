@@ -4,7 +4,7 @@
 //   return `${window.location.origin}/api`;
 // })();
 
-export const BASE = "http://localhost:8000/api";
+export const BASE = "https://the-trust-gambit.onrender.com/api";
 
 export function getToken() {
   return localStorage.getItem("tg_token") || "";
