@@ -3,7 +3,7 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure--jdh%9p0*xt0%6*y1+^ewd%zwl2huunb&+-4z&il7yvyq8g_83"
-DEBUG = True
+# DEBUG = True
 ALLOWED_HOSTS = ['*']
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -58,13 +58,31 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 WSGI_APPLICATION = "trust_game.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        # "NAME": BASE_DIR / "db.sqlite3",
-        'NAME': os.path.join('/opt/render/project/src/db', 'db.sqlite3'),
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.sqlite3",
+#         # "NAME": BASE_DIR / "db.sqlite3",
+#         'NAME': os.path.join('/opt/render/project/src/db', 'db.sqlite3'),
+#     }
+# }
+# settings.py
+
+if os.environ.get("RENDER") == "true":
+    # On Render
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.path.join('/opt/render/project/src/db', 'db.sqlite3'),
+        }
     }
-}
+else:
+    # Local development
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
