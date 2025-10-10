@@ -20,6 +20,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Add this
+
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -47,10 +49,10 @@ TEMPLATES = [
     },
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "https://yourfrontend.com",
-    "http://localhost:5173",
-]
+# CORS_ALLOWED_ORIGINS = [
+#     "https://yourfrontend.com",
+#     "http://localhost:5173",
+# ]
 
 CORS_ALLOW_ALL_ORIGINS = True
 
