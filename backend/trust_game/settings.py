@@ -47,7 +47,12 @@ TEMPLATES = [
     },
 ]
 
-CORS_ALLOWED_ORIGINS = ['*']
+CORS_ALLOWED_ORIGINS = [
+    "https://yourfrontend.com",
+    "http://localhost:5173",
+]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 WSGI_APPLICATION = "trust_game.wsgi.application"
 
