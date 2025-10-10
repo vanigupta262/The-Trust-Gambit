@@ -28,7 +28,7 @@ class ParticipantProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Participant
-        fields = ['id', 'user', 'hostel']
+        fields = ['id', 'user', 'hostel', 'current_lobby']
 
 class SelfRatingSerializer(serializers.ModelSerializer):
     participant = serializers.PrimaryKeyRelatedField(queryset=Participant.objects.all())

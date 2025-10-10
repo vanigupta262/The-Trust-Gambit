@@ -4,7 +4,8 @@ from .views import (
     ParticipantProfileView, DomainListView, RoundListView, 
     SelfRatingCreateListView, HostelListView,
     CurrentRoundView, SubmitActionView,
-    LeaderboardView, AdminEndRoundView, AllRatingsListView
+    LeaderboardView, AdminEndRoundView, AllRatingsListView,
+    AdminAssignLobbiesView
 )
 
 urlpatterns = [
@@ -22,6 +23,8 @@ urlpatterns = [
 
     path('rounds/', RoundListView.as_view(), name='round-list'),
     path('rounds/<int:round_id>/delegation-graph/', DelegationGraphView.as_view(), name='delegation-graph'),
+    # path('lobbies/<int:lobby_id>/leaderboard/', LobbyLeaderboardView.as_view(), name='lobby-leaderboard'),
 
     path('admin/end-round/', AdminEndRoundView.as_view(), name='admin-end-round'),
+    path('admin/assign-lobbies/', AdminAssignLobbiesView.as_view(), name='admin-assign-lobbies'),
 ]
