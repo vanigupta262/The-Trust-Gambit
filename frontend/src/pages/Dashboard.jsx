@@ -1,25 +1,37 @@
 import { useEffect, useState } from "react";
-import { apiCurrentRound, apiSubmitAction } from "../api.js";
+import { apiCurrentRound, apiSubmitAction, apiGetAllRatings } from "../api.js";
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [round, setRound] = useState(null);
   const [delegationTargets, setDelegationTargets] = useState([]);
+  const [delegationRatings, setDelegationRatings] = useState([]);
 
   const [actionType, setActionType] = useState("SOLVE");
   const [submittedAnswer, setSubmittedAnswer] = useState("");
   const [delegatedTo, setDelegatedTo] = useState("");
 
   useEffect(() => {
-    setLoading(true);
-    apiCurrentRound()
-      .then((res) => {
+    const fetchData = async () => {
+      try {
+        const res = await apiCurrentRound();
         setRound(res.current_round);
         setDelegationTargets(res.delegation_targets || []);
-      })
-      .catch((err) => setError(err.message || "Failed to load round"))
-      .finally(() => setLoading(false));
+
+        const data = await apiGetAllRatings();
+        const filteredData =
+          data.filter((rating) => rating.domain === res.current_round) || [];
+        setDelegationRatings(filteredData);
+      } catch (err) {
+        setError(err.message || "Failed to load round");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    setLoading(true);
+    fetchData();
   }, []);
 
   const onSubmitAction = async (e) => {
@@ -146,6 +158,11 @@ export default function Dashboard() {
                 {delegationTargets.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.username}
+                    {` (Self Rating: ${
+                      delegationRatings.find(
+                        (rating) => rating.participant.id === d.id
+                      )?.rating || "N/A"
+                    })`}
                   </option>
                 ))}
               </select>

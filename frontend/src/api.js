@@ -89,3 +89,4 @@ export const apiRoundGraph = (roundId) =>
 export const apiPostSelfRatings = (payload) =>
   request("/self-ratings/", { method: "POST", body: payload });
 export const apiGetSelfRatings = () => request("/self-ratings/");
+export const apiGetAllRatings = () => request("/all-ratings/");
