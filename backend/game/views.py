@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from django.contrib.auth.models import User
 
 from .models import Action, Game, GameScore, Participant, Domain, SelfRating, Hostel, Round
-from .serializers import GameScoreSerializer, UserSerializer, ParticipantProfileSerializer, SelfRatingSerializer, HostelSerializer, RoundSerializer, SimpleParticipantSerializer, ActionSerializer
+from .serializers import GameScoreSerializer, UserSerializer, ParticipantProfileSerializer, SelfRatingSerializer, PublicSelfRatingSerializer, HostelSerializer, RoundSerializer, SimpleParticipantSerializer, ActionSerializer
 
 from .scoring import calculate_scores_for_round
 
@@ -102,6 +102,14 @@ class SelfRatingCreateListView(generics.ListCreateAPIView):
             
         serializer.save()
 
+class AllRatingsListView(generics.ListAPIView):
+    """
+    Provides a public, read-only list of all self-ratings from all participants.
+    """
+    queryset = SelfRating.objects.all().select_related('participant__user', 'domain')
+    serializer_class = PublicSelfRatingSerializer
+    permission_classes = [IsAuthenticated] # Only logged-in users can see this
+    
 class HostelListView(generics.ListAPIView):
     queryset = Hostel.objects.all()
     serializer_class = HostelSerializer
@@ -208,8 +216,13 @@ class DelegationGraphView(APIView):
         round_obj = get_object_or_404(Round, id=round_id)
         actions = Action.objects.filter(round=round_obj).select_related('participant__user', 'delegated_to__user')
 
-        participants_in_round = {action.participant for action in actions}
-        
+        # participants_in_round = {action.participant for action in actions}
+        participants_in_round = set()
+        for action in actions:
+            participants_in_round.add(action.participant)
+            if action.delegated_to:
+                participants_in_round.add(action.delegated_to)
+
         nodes = []
         for p in participants_in_round:
             nodes.append({

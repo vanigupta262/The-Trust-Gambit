@@ -4,7 +4,7 @@ from .views import (
     ParticipantProfileView, DomainListView, RoundListView, 
     SelfRatingCreateListView, HostelListView,
     CurrentRoundView, SubmitActionView,
-    LeaderboardView, AdminEndRoundView
+    LeaderboardView, AdminEndRoundView, AllRatingsListView
 )
 
 urlpatterns = [
@@ -14,7 +14,8 @@ urlpatterns = [
     path('domains/', DomainListView.as_view(), name='domain-list'),
     path('hostels/', HostelListView.as_view(), name='hostel-list'),
     path('self-ratings/', SelfRatingCreateListView.as_view(), name='self-rating-list-create'),
-    
+    path('all-ratings/', AllRatingsListView.as_view(), name='all-ratings-list'),
+
     path('current-round/', CurrentRoundView.as_view(), name='current-round'),
     path('submit-action/', SubmitActionView.as_view(), name='submit-action'),
     path('leaderboard/', LeaderboardView.as_view(), name='leaderboard'),

@@ -46,7 +46,7 @@ class SelfRatingSerializer(serializers.ModelSerializer):
         ).exists():
             raise serializers.ValidationError("Participant has already rated this domain.")
         return data
-    
+        
 class SimpleParticipantSerializer(serializers.ModelSerializer):
     """A simple serializer to list participants for delegation choices."""
     username = serializers.CharField(source='user.username', read_only=True)
@@ -54,6 +54,18 @@ class SimpleParticipantSerializer(serializers.ModelSerializer):
         model = Participant
         fields = ['id', 'username']
 
+
+class PublicSelfRatingSerializer(serializers.ModelSerializer):
+    """
+    A read-only serializer to publicly display all user ratings.
+    """
+    participant = SimpleParticipantSerializer(read_only=True)
+    domain = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = SelfRating
+        fields = ['participant', 'domain', 'rating']
+        
 class RoundSerializer(serializers.ModelSerializer):
     domain = serializers.StringRelatedField() # Show the domain name instead of its ID
     class Meta:
