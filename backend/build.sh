@@ -3,7 +3,7 @@ set -o errexit
 
 pip install --upgrade pip
 
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 
 cd backend
 
