@@ -5,6 +5,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure--jdh%9p0*xt0%6*y1+^ewd%zwl2huunb&+-4z&il7yvyq8g_83"
 # DEBUG = True
 DEBUG = os.environ.get("RENDER") != "true"
+if not DEBUG:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 ALLOWED_HOSTS = ['*']
 INSTALLED_APPS = [
@@ -107,6 +109,7 @@ USE_I18N = True
 USE_TZ = True
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATIC_URL = '/static/'
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
