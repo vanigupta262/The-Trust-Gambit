@@ -7,10 +7,11 @@ from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
 
-from .models import Action, Game, GameScore, Participant, Domain, SelfRating, Hostel, Round
+from .models import Action, Game, GameScore, Participant, Domain, SelfRating, Hostel, Round, Lobby
 from .serializers import GameScoreSerializer, UserSerializer, ParticipantProfileSerializer, SelfRatingSerializer, PublicSelfRatingSerializer, HostelSerializer, RoundSerializer, SimpleParticipantSerializer, ActionSerializer
 
 from .scoring import calculate_scores_for_round
+from .lobby_utils import assign_participants_to_lobbies
 
 class RegisterUserView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -102,6 +103,21 @@ class SelfRatingCreateListView(generics.ListCreateAPIView):
             
         serializer.save()
 
+class AdminAssignLobbiesView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, *args, **kwargs):
+        lobby_size = request.data.get('lobby_size')
+        if not lobby_size or not isinstance(lobby_size, int) or lobby_size <= 0:
+            return Response({'error': 'A valid integer lobby_size is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        result = assign_participants_to_lobbies(lobby_size)
+        
+        if "error" in result:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response(result, status=status.HTTP_200_OK)
+
 class AllRatingsListView(generics.ListAPIView):
     """
     Provides a public, read-only list of all self-ratings from all participants.
@@ -122,12 +138,19 @@ class CurrentRoundView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        current_round = Round.objects.filter(is_completed=False).order_by('-round_number').first()
+        active_game = Game.objects.filter(is_active=True).first()
+        if not active_game:
+            return Response({"detail": "No active game at the moment."}, status=404)
 
+        current_round = Round.objects.filter(game=active_game, is_completed=False).order_by('-round_number').first()
         if not current_round:
             return Response({"detail": "No active round at the moment."}, status=status.HTTP_404_NOT_FOUND)
+        
+        user_lobby = request.user.participant.current_lobby
+        if not user_lobby:
+            return Response({"detail": "You have not been assigned to a lobby yet."}, status=400)
 
-        other_participants = Participant.objects.exclude(user=request.user)
+        other_participants = Participant.objects.filter(current_lobby=user_lobby).exclude(user=request.user)
         
         round_serializer = RoundSerializer(current_round)
         participants_serializer = SimpleParticipantSerializer(other_participants, many=True)
@@ -136,6 +159,15 @@ class CurrentRoundView(APIView):
             'current_round': round_serializer.data,
             'delegation_targets': participants_serializer.data
         })
+
+# class LobbyLeaderboardView(generics.ListAPIView):
+#     # (Requirement 4: Leaderboard is lobby-specific)
+#     serializer_class = GameScoreSerializer
+#     permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         lobby_id = self.kwargs.get('lobby_id')
+#         return GameScore.objects.filter(participant__current_lobby_id=lobby_id).order_by('-score')
 
 class SubmitActionView(generics.CreateAPIView):
     """
@@ -147,6 +179,10 @@ class SubmitActionView(generics.CreateAPIView):
     def get_serializer_context(self):
         # Pass the current round to the serializer for validation
         context = super().get_serializer_context()
+        active_game = Game.objects.filter(is_active=True).first()
+        if not active_game:
+            raise serializers.ValidationError("No active game to submit an action for.")
+        
         current_round = Round.objects.filter(is_completed=False).order_by('-round_number').first()
         if not current_round:
             # This should ideally be handled with a custom exception
@@ -163,22 +199,44 @@ class SubmitActionView(generics.CreateAPIView):
             round=current_round
         )
 
-class LeaderboardView(generics.ListAPIView):
+# class LeaderboardView(generics.ListAPIView):
+#     """
+#     Provides a view of the game leaderboard, ordered by score.
+#     """
+#     serializer_class = GameScoreSerializer
+#     permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         # Assuming there is one main active game. 
+#         # This could be enhanced to select a game via URL parameter.
+#         active_game = Game.objects.filter(is_active=True).first()
+#         if not active_game:
+#             return GameScore.objects.none() # Return empty queryset if no active game
+        
+#         return GameScore.objects.filter(game=active_game).order_by('-score')
+
+class LeaderboardView(APIView):
     """
-    Provides a view of the game leaderboard, ordered by score.
+    Provides the leaderboard for the currently logged-in user's lobby.
+    The lobby is determined automatically from the user's profile.
     """
-    serializer_class = GameScoreSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        # Assuming there is one main active game. 
-        # This could be enhanced to select a game via URL parameter.
-        active_game = Game.objects.filter(is_active=True).first()
-        if not active_game:
-            return GameScore.objects.none() # Return empty queryset if no active game
-        
-        return GameScore.objects.filter(game=active_game).order_by('-score')
+    def get(self, request, *args, **kwargs):
+        participant = request.user.participant
+        lobby = participant.current_lobby
 
+        if not lobby:
+            # If the user isn't in a lobby, return an empty list.
+            return Response([], status=status.HTTP_200_OK)
+
+        # Get all scores for participants who are in the user's lobby
+        queryset = GameScore.objects.filter(participant__current_lobby=lobby).order_by('-score')
+        
+        # Serialize the data and return it
+        serializer = GameScoreSerializer(queryset, many=True)
+        return Response(serializer.data)
+    
 class AdminEndRoundView(APIView):
     """
     An admin-only endpoint to trigger the scoring for the current active round.
@@ -213,23 +271,24 @@ class DelegationGraphView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, round_id, *args, **kwargs):
-        round_obj = get_object_or_404(Round, id=round_id)
-        actions = Action.objects.filter(round=round_obj).select_related('participant__user', 'delegated_to__user')
+        try:
+            round_obj = Round.objects.get(id=round_id)
+        except Round.DoesNotExist:
+            return Response({"detail": "Round not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        user_lobby = request.user.participant.current_lobby
+        if not user_lobby:
+            return Response({"detail": "You are not in a lobby."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # participants_in_round = {action.participant for action in actions}
-        participants_in_round = set()
-        for action in actions:
-            participants_in_round.add(action.participant)
-            if action.delegated_to:
-                participants_in_round.add(action.delegated_to)
-
-        nodes = []
-        for p in participants_in_round:
-            nodes.append({
-                'id': str(p.id),
-                'data': {'label': p.user.username},
-                'position': {'x': 0, 'y': 0} 
-            })
+        # 1. Get ALL participants in the lobby to serve as the nodes.
+        all_lobby_participants = Participant.objects.filter(current_lobby=user_lobby).select_related('user')
+        nodes = [{'id': str(p.id), 'data': {'label': p.user.username}, 'position': {'x': 0, 'y': 0}} for p in all_lobby_participants]
+        
+        # 2. Get only the actions from that lobby for the specific round to create the edges.
+        actions = Action.objects.filter(
+            round=round_obj, 
+            participant__current_lobby=user_lobby
+        ).select_related('participant', 'delegated_to')
 
         edges = []
         for action in actions:

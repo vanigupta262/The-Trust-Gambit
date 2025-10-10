@@ -8,9 +8,27 @@ class Hostel(models.Model):
     def __str__(self):
         return self.name
 
+class Game(models.Model):
+    name = models.CharField(max_length=200, default="The Trust Gambit")
+    is_active = models.BooleanField(default=True)
+    lambda_param = models.FloatField(default=0.5) 
+    beta_param = models.FloatField(default=0.2)   
+
+    def __str__(self):
+        return self.name
+
+class Lobby(models.Model):
+    name = models.CharField(max_length=100)
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='lobbies')
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Lobby: {self.name} (Game: {self.game.name})"
+    
 class Participant(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     hostel = models.ForeignKey(Hostel, on_delete=models.SET_NULL, null=True, blank=True)
+    current_lobby = models.ForeignKey(Lobby, on_delete=models.SET_NULL, null=True, blank=True, related_name='participants')
 
     def __str__(self):
         return self.user.username
@@ -36,17 +54,10 @@ class SelfRating(models.Model):
     def __str__(self):
         return f"{self.participant.user.username} rates {self.domain.name} as {self.rating}"
 
-class Game(models.Model):
-    name = models.CharField(max_length=200, default="The Trust Gambit")
-    is_active = models.BooleanField(default=True)
-    lambda_param = models.FloatField(default=0.5) 
-    beta_param = models.FloatField(default=0.2)   
-
-    def __str__(self):
-        return self.name
-
 class Round(models.Model):
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='rounds')
+    # lobby = models.ForeignKey(Lobby, on_delete=models.CASCADE, related_name='rounds', null=True)
+    
     domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
     question_text = models.TextField()
     correct_answer = models.CharField(max_length=255, default='correct answer here') 
