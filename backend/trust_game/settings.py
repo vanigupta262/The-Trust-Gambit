@@ -1,5 +1,7 @@
 from pathlib import Path
 import os
+import dj_database_url
+from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure--jdh%9p0*xt0%6*y1+^ewd%zwl2huunb&+-4z&il7yvyq8g_83"
@@ -62,12 +64,22 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 WSGI_APPLICATION = "trust_game.wsgi.application"
 
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.sqlite3",
+#         "NAME": BASE_DIR / "db.sqlite3",
+#         # 'NAME': os.path.join('/opt/render/project/src/db', 'db.sqlite3'),
+#     }
+# }
+
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-        # 'NAME': os.path.join('/opt/render/project/src/db', 'db.sqlite3'),
-    }
+    'default': dj_database_url.config(
+        default=config(
+            'DATABASE_URL',
+            default='postgresql://trustdb_2l4w_user:zah05srgueHKTfEbwZ93QcRAdof2MR2l@dpg-d3ku6chr0fns73et39j0-a/trustdb_2l4w'
+        ),
+        conn_max_age=600
+    )
 }
 
 # if os.environ.get("RENDER") == "true":
