@@ -44,7 +44,7 @@ def calculate_scores_for_round(round_id):
                 cycle_start_index = path.index(current)
                 # Penalize all members of the found cycle
                 for member_id in path[cycle_start_index:]:
-                    base_round_points[member_id] = -1
+                    base_round_points[member_id] = -1- 2*game.lambda_param
                     all_cycle_members.add(member_id)
                 break 
             path.append(current)
@@ -83,7 +83,7 @@ def calculate_scores_for_round(round_id):
     
     for p_id, base_points in base_round_points.items():
         # Bonus is only applied if the base score (from solving) is positive.
-        if base_points > 0:
+        if base_points > 0 and action_map[p_id].action_type == Action.ActionType.SOLVE:
             bonus = game.beta_param * trust_counts.get(p_id, 0)
             final_round_points[p_id] += bonus
 
@@ -138,15 +138,16 @@ def _calculate_delegation_points(p_id, action_map, base_round_points, game, memo
     final_points = 0
     lambda_param = game.lambda_param
     if points_j > 0:
-        final_points = lambda_param * points_j
+        if (points_j == 1): final_points = 1 + lambda_param
+        else: final_points = (points_j - 1) * lambda_param + 1
     elif points_j < 0:
         # This correctly handles chains delegating into a cycle (e.g., points_j = -1)
-        final_points = points_j / lambda_param if lambda_param != 0 else points_j
+        if (points_j == -1): final_points = -1 - lambda_param
+        else: final_points = (points_j + 1) * lambda_param - 1
     else: # points_j == 0
-        final_points = -1
+        final_points = -1 - lambda_param
 
     base_round_points[p_id] = final_points
     memo[p_id] = final_points
     return final_points
-
 
