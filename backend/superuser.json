@@ -1,1 +1,20 @@
 [
+    {
+        "model": "auth.user",
+        "pk": 1,
+        "fields": {
+            "password": "pbkdf2_sha256$1000000$0RDF7eA5S0hBCgScv4sPtW$dsUrlkrA89oslX3fBvGyni8f7u9+VrQhYqRELa39IxI=",
+            "last_login": "2025-10-02T12:01:58.365Z",
+            "is_superuser": true,
+            "username": "smartgambler",
+            "first_name": "",
+            "last_name": "",
+            "email": "mrimyth1@gmail.com",
+            "is_staff": true,
+            "is_active": true,
+            "date_joined": "2025-10-02T12:00:11.337Z",
+            "groups": [],
+            "user_permissions": []
+        }
+    }
+]
